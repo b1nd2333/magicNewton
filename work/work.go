@@ -50,7 +50,7 @@ func ADS() {
 
 	proxiesMap := make(map[string]string)
 	for _, v := range proxies {
-		proxy := strings.SplitAfter(v, ":")
+		proxy := strings.Split(v, ":")
 		if len(proxy) != 5 {
 			fmt.Printf("proxy.txt文件格式不对，格式应为ADS环境编号:ip:port:username:password请检查。\n")
 			return
