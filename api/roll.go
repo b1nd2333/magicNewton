@@ -57,6 +57,21 @@ func roll(num int, token, proxyStr string) {
 
 	// 检查响应状态码
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusBadRequest {
+			// 读取响应数据
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				fmt.Printf("读取响应体出错: %v\n", err)
+				roll(num, token, proxyStr)
+				return
+			}
+
+			if strings.Contains(string(body), "Quest already completed") {
+				fmt.Printf("账号%d今日已签到\n", num)
+				return
+			}
+		}
+
 		roll(num, token, proxyStr)
 		return
 	}
@@ -69,6 +84,7 @@ func roll(num int, token, proxyStr string) {
 		return
 	}
 
+	fmt.Println(string(body))
 	// 检查是否是 Gzip 压缩
 	if resp.Header.Get("Content-Encoding") == "br" {
 		body, err = decompressBrotli(body)

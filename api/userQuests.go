@@ -98,8 +98,17 @@ func UserQuests(num int, token, proxyStr string) {
 	respModel := &RespStruct{}
 	json.Unmarshal(body, respModel)
 
+	//fmt.Println(string(body))
 	currentUTC := time.Now().UTC()
-	lastCheckTime := respModel.Data[len(respModel.Data)-1].CreatedAt.Add(24 * time.Hour)
+	var lastCheckTime time.Time
+	//roll(num, token, proxyStr)
+	for _, v := range respModel.Data {
+		if v.QuestId == "f56c760b-2186-40cb-9cbc-3af4a3dc20e2" { //最后一次签到时间
+			lastCheckTime = v.CreatedAt.Add(24 * time.Hour)
+		}
+	}
+
+	//lastCheckTime := respModel.Data[len(respModel.Data)-1].CreatedAt.Add(24 * time.Hour)
 	if currentUTC.After(lastCheckTime) { // 在之后，可以签到
 		roll(num, token, proxyStr)
 	} else { // 不能签到
