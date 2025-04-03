@@ -60,6 +60,19 @@ func UserQuests(num int, token, proxyStr string) {
 
 	// 检查响应状态码
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusBadRequest {
+			// 读取响应数据
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				fmt.Printf("读取响应体出错: %v\n", err)
+				UserQuests(num, token, proxyStr)
+				return
+			}
+			if strings.Contains(string(body), "Invalid session") {
+				fmt.Printf("账号%dSession已过期\n", num)
+				return
+			}
+		}
 		UserQuests(num, token, proxyStr)
 		return
 	}
