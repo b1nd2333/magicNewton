@@ -2,6 +2,7 @@ package work
 
 import (
 	"fmt"
+	"github.com/fatih/color"
 	"log"
 	"magicNewton/api"
 	"magicNewton/common"
@@ -64,10 +65,22 @@ func ADS() {
 			if len(keys) == 2 {
 				proxyStr := proxiesMap[keys[0]]
 				if proxyStr == "" {
-					fmt.Printf("账号%d未找到对应编号代理，跳过\n", i+1)
+					color.Yellow("账号%d未找到对应编号代理，跳过\n", i+1)
 					continue
 				}
-				api.UserQuests(i+1, keys[1], proxyStr)
+				err = api.UserQuests(i+1, keys[1], proxyStr)
+				if err != nil && strings.Contains(err.Error(), "socks connect tcp") {
+					color.Red("账号%d代理出错，跳过\n", i+1)
+					continue
+				}
+
+				for err != nil {
+					err = api.UserQuests(i+1, keys[1], proxyStr)
+					if err != nil && strings.Contains(err.Error(), "socks connect tcp") {
+						color.Red("账号%d代理出错，跳过\n", i+1)
+						break
+					}
+				}
 			} else {
 				log.Fatalln("token.txt格式不对，格式为环境编号:token，或者token，请检查")
 			}

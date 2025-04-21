@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/fatih/color"
 	"io"
 	"net/http"
 	"strings"
@@ -23,7 +24,7 @@ type rollRespStruct struct {
 	} `json:"data"`
 }
 
-func roll(num int, token, proxyStr string) {
+func roll(num int, token, proxyStr string) error {
 	ip, port, username, password := parseProxy(proxyStr)
 	proxyAddress := "socks5://" + username + ":" + password + "@" + ip + ":" + port
 
@@ -31,8 +32,7 @@ func roll(num int, token, proxyStr string) {
 	client, err := newHTTPClientWithProxy(proxyAddress)
 	if err != nil {
 		fmt.Println(err)
-		roll(num, token, proxyStr)
-		return
+		return roll(num, token, proxyStr)
 	}
 
 	// 创建请求
@@ -40,8 +40,7 @@ func roll(num int, token, proxyStr string) {
 	req, err := http.NewRequest("POST", "https://www.magicnewton.com/portal/api/userQuests", strings.NewReader(bodyStr))
 	if err != nil {
 		fmt.Println(err)
-		roll(num, token, proxyStr)
-		return
+		return roll(num, token, proxyStr)
 	}
 
 	req.Header = createHeaders(token)
@@ -49,9 +48,7 @@ func roll(num int, token, proxyStr string) {
 	// 发送请求
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
-		roll(num, token, proxyStr)
-		return
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -62,44 +59,40 @@ func roll(num int, token, proxyStr string) {
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				fmt.Printf("读取响应体出错: %v\n", err)
-				roll(num, token, proxyStr)
-				return
+				return err
 			}
 
 			if strings.Contains(string(body), "Quest already completed") {
 				fmt.Printf("账号%d今日已签到\n", num)
-				return
+				return nil
 			}
 		}
 
-		roll(num, token, proxyStr)
-		return
+		return err
 	}
 
 	// 读取响应数据
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Printf("读取响应体出错: %v\n", err)
-		roll(num, token, proxyStr)
-		return
+		return roll(num, token, proxyStr)
 	}
 
-	fmt.Println(string(body))
 	// 检查是否是 Gzip 压缩
 	if resp.Header.Get("Content-Encoding") == "br" {
 		body, err = decompressBrotli(body)
 		if err != nil {
 			fmt.Println("解压 Gzip 失败:", err)
-			roll(num, token, proxyStr)
-			return
+			return roll(num, token, proxyStr)
 		}
 	}
 
 	rollRespModel := &rollRespStruct{}
 	err = json.Unmarshal(body, rollRespModel)
 	if rollRespModel.Message == "Quest completed" {
-		fmt.Printf("账号%d投掷成功，获得%d积分\n", num, rollRespModel.Data.Credits)
+		color.Green("账号%d投掷成功，获得%d积分\n", num, rollRespModel.Data.Credits)
 	} else {
-		fmt.Printf("账号%d投掷失败，%s\n", num, rollRespModel.Message)
+		color.Red("账号%d投掷失败，%s\n", num, rollRespModel.Message)
 	}
+	return nil
 }

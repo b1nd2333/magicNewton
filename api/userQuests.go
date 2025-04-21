@@ -3,8 +3,10 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/andybalholm/brotli"
+	"github.com/fatih/color"
 	"io"
 	"net/http"
 	"strings"
@@ -27,7 +29,7 @@ type RespStruct struct {
 }
 
 // UserQuests 获取上次完成时间，是否24小时
-func UserQuests(num int, token, proxyStr string) {
+func UserQuests(num int, token, proxyStr string) error {
 	ip, port, username, password := parseProxy(proxyStr)
 	proxyAddress := "socks5://" + username + ":" + password + "@" + ip + ":" + port
 
@@ -35,16 +37,14 @@ func UserQuests(num int, token, proxyStr string) {
 	client, err := newHTTPClientWithProxy(proxyAddress)
 	if err != nil {
 		fmt.Println(err)
-		UserQuests(num, token, proxyStr)
-		return
+		return err
 	}
 
 	// 创建请求
 	req, err := http.NewRequest("GET", "https://www.magicnewton.com/portal/api/userQuests", nil)
 	if err != nil {
 		fmt.Println(err)
-		UserQuests(num, token, proxyStr)
-		return
+		return err
 	}
 
 	req.Header = createHeaders(token)
@@ -52,9 +52,7 @@ func UserQuests(num int, token, proxyStr string) {
 	// 发送请求
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
-		UserQuests(num, token, proxyStr)
-		return
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -65,24 +63,21 @@ func UserQuests(num int, token, proxyStr string) {
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				fmt.Printf("读取响应体出错: %v\n", err)
-				UserQuests(num, token, proxyStr)
-				return
+				return err
 			}
 			if strings.Contains(string(body), "Invalid session") {
-				fmt.Printf("账号%dSession已过期\n", num)
-				return
+				color.Red("账号%dSession已过期\n", num)
+				return nil
 			}
 		}
-		UserQuests(num, token, proxyStr)
-		return
+		return errors.New(resp.Status)
 	}
 
 	// 读取响应数据
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Printf("读取响应体出错: %v\n", err)
-		UserQuests(num, token, proxyStr)
-		return
+		return err
 	}
 
 	// 检查是否是 Gzip 压缩
@@ -90,8 +85,7 @@ func UserQuests(num int, token, proxyStr string) {
 		body, err = decompressBrotli(body)
 		if err != nil {
 			fmt.Println("解压 Gzip 失败:", err)
-			UserQuests(num, token, proxyStr)
-			return
+			return err
 		}
 	}
 
@@ -110,11 +104,15 @@ func UserQuests(num int, token, proxyStr string) {
 
 	//lastCheckTime := respModel.Data[len(respModel.Data)-1].CreatedAt.Add(24 * time.Hour)
 	if currentUTC.After(lastCheckTime) { // 在之后，可以签到
-		roll(num, token, proxyStr)
+		err = roll(num, token, proxyStr)
+		if err != nil {
+			return err
+		}
 	} else { // 不能签到
-		fmt.Printf("账号%d还未到达签到时间，下次时间为UTC时间%s\n", num, lastCheckTime.Format(time.RFC3339))
+		color.Yellow("账号%d还未到达签到时间，下次时间为UTC时间%s\n", num, lastCheckTime.Format(time.RFC3339))
 	}
 
+	return nil
 }
 
 func parseProxy(account string) (ip, port, username, password string) {
